@@ -1,0 +1,36 @@
+{
+  "projectType": "azd",
+  "iacTypes": [
+    "bicep"
+  ],
+  "resources": [
+    {
+      "type": "azurecontainerapp",
+      "instances": [
+        {
+          "name": "src"
+        }
+      ]
+    }
+  ],
+  "bindings": [],
+  "services": [
+    {
+      "host": "${azurecontainerapp.src}",
+      "language": "dotnet",
+      "project": "src/",
+      "port": "8080"
+    }
+  ],
+  "settings": [
+    {
+      "resource": "${azurecontainerapp.src}",
+      "envs": [
+        {
+          "name": "ASPNETCORE_ENVIRONMENT",
+          "value": ""
+        }
+      ]
+    }
+  ]
+}

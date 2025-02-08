@@ -1,0 +1,68 @@
+name: Deploy to Azure - Demo 
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+    ACR_NAME: techconnect2025acr2
+    LOCATION: westeurope
+    DEPLOYMENT_BICEP_PATH: |
+        infra/main.bicep
+    IMAGE_TAG: 'bs-${{ github.sha }}'
+    IMAGE_NAME: 'albumapi_csharp2'
+    DOCKERFILE_PATH: |
+        src/Dockerfile
+
+jobs:
+  aca_build_tag_push_deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Log in to Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+       
+    - name: Set up Bicep CLI
+      run: |
+        az bicep install
+      
+    - name: Deploy Bicep template
+      run: |
+        az deployment sub create --location ${{ env.LOCATION }} --template-file ${{ env.DEPLOYMENT_BICEP_PATH }}  
+    
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Login / Build / Tag / Push
+      run: |
+        az acr login --name ${{ env.ACR_NAME }}
+        docker build -t ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} . -f ${{ env.DOCKERFILE_PATH }}
+        docker tag ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }} ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+        docker push ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+    - name: Deploy Container App
+      uses: Azure/cli@v1
+      with:
+        inlineScript: |
+          echo "Installing containerapp extension"
+          az extension add --name containerapp
+          echo "Starting Deploying"
+          az containerapp update  --name albumapi --resource-group TC2025RGDemo3 --image ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+    - name: Run integration tests
+      run: |
+        # Add commands to run your integration tests here
+
